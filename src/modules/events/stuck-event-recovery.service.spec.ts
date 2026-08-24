@@ -9,7 +9,7 @@ describe('StuckEventRecoveryService', () => {
     id: 'evt-stale-001',
     employeeId: 'EMP-001',
     eventType: 'SALARY_CHANGE' as const,
-    payload: { salary: 50000 },
+    payload: { effectiveDate: '2026-01-15', newSalary: 75000, currency: 'USD' },
     status: 'PROCESSING' as const,
     idempotencyKey: 'idem-001',
     sequence: 1,

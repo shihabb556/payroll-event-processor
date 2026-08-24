@@ -12,7 +12,7 @@ describe('EventsRepository — stale event recovery', () => {
     id: 'evt-001',
     employeeId: 'EMP-001',
     eventType: 'SALARY_CHANGE',
-    payload: { salary: 50000 },
+    payload: { effectiveDate: '2026-01-15', newSalary: 75000, currency: 'USD' },
     status: 'PROCESSING',
     idempotencyKey: 'idem-001',
     sequence: 1,

@@ -30,18 +30,20 @@ export class AddressChangeHandler implements EventHandler {
 
     const street = event.payload.street as string;
     const city = event.payload.city as string;
-    const state = event.payload.state as string;
-    const zip = event.payload.zip as string;
+    const postalCode = event.payload.postalCode as string;
+    const country = event.payload.country as string;
+    const effectiveDate = event.payload.effectiveDate as string;
 
     return Promise.resolve({
       success: true,
-      message: `Address updated successfully for employee ${event.employeeId}`,
+      message: `Address updated to ${street}, ${city}, ${postalCode}, ${country} for employee ${event.employeeId} (effective ${effectiveDate})`,
       processedAt: new Date().toISOString(),
       data: {
         street,
         city,
-        state,
-        zip,
+        postalCode,
+        country,
+        effectiveDate,
       },
     });
   }

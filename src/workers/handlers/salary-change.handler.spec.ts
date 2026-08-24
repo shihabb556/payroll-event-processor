@@ -9,7 +9,9 @@ describe('SalaryChangeHandler', () => {
     employeeId: 'EMP-003',
     eventType: 'SALARY_CHANGE',
     payload: {
-      salary: 75000,
+      effectiveDate: '2026-01-15',
+      newSalary: 75000,
+      currency: 'USD',
     },
   };
 
@@ -22,8 +24,14 @@ describe('SalaryChangeHandler', () => {
 
     expect(result.success).toBe(true);
     expect(result.message).toContain('EMP-003');
+    expect(result.message).toContain('75000');
+    expect(result.message).toContain('USD');
     expect(result.processedAt).toBeDefined();
-    expect(result.data).toEqual({ salary: 75000 });
+    expect(result.data).toEqual({
+      newSalary: 75000,
+      currency: 'USD',
+      effectiveDate: '2026-01-15',
+    });
   });
 
   it('should throw on temporary failure', () => {

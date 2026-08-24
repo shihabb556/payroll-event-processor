@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 
 import { PayrollEventQueue } from '../../infrastructure/queue/payroll-event.queue';
 import { CreateEventDto } from './dto/create-event.dto';
+import { validateEventPayload } from './dto/validate-payload';
 import { EmployeeSequencesRepository } from './repositories/employee-sequences.repository';
 import { EventsRepository } from './repositories/events.repository';
 
@@ -16,6 +17,9 @@ export class EventsService {
   ) {}
 
   async createEvent(dto: CreateEventDto) {
+    // Validate event-type-specific payload fields
+    await validateEventPayload(dto.eventType, dto.payload);
+
     // Fast path: check if event already exists (idempotency)
     const existingEvent = await this.eventsRepository.findByIdempotencyKey(
       dto.idempotencyKey,
@@ -88,6 +92,10 @@ export class EventsService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  async listEvents() {
+    return this.eventsRepository.findAll(100);
   }
 
   async getEvent(id: string) {

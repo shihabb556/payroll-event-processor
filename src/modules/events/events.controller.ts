@@ -7,11 +7,18 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
+import {
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { CreateEventDto } from './dto/create-event.dto';
 import { EventAttemptsRepository } from './repositories/event-attempts.repository';
 import { EventsService } from './events.service';
 
+@ApiTags('Events')
 @Controller('api/v1/events')
 export class EventsController {
   constructor(
@@ -21,6 +28,10 @@ export class EventsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Submit a payroll event for processing' })
+  @ApiResponse({ status: 201, description: 'Event created or already exists (idempotent)' })
+  @ApiResponse({ status: 400, description: 'Invalid request payload' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
   async createEvent(@Body() dto: CreateEventDto) {
     const result = await this.eventsService.createEvent(dto);
 
@@ -53,7 +64,30 @@ export class EventsController {
     };
   }
 
+  @Get()
+  @ApiOperation({ summary: 'List recent events' })
+  @ApiResponse({ status: 200, description: 'List of events' })
+  async listEvents() {
+    const events = await this.eventsService.listEvents();
+    return {
+      events: events.map((e) => ({
+        id: e.id,
+        employeeId: e.employeeId,
+        eventType: e.eventType,
+        status: e.status,
+        sequence: e.sequence,
+        idempotencyKey: e.idempotencyKey,
+        createdAt: e.createdAt,
+        completedAt: e.completedAt,
+      })),
+    };
+  }
+
   @Get(':id')
+  @ApiOperation({ summary: 'Get event details with attempt history' })
+  @ApiParam({ name: 'id', description: 'Event UUID' })
+  @ApiResponse({ status: 200, description: 'Event details' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
   async getEvent(@Param('id') id: string) {
     const event = await this.eventsService.getEvent(id);
     const attempts = await this.eventAttemptsRepository.findByEventId(id);

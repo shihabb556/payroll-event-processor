@@ -9,10 +9,11 @@ describe('AddressChangeHandler', () => {
     employeeId: 'EMP-002',
     eventType: 'ADDRESS_CHANGE',
     payload: {
+      effectiveDate: '2026-02-01',
       street: '123 Main St',
       city: 'Boston',
-      state: 'MA',
-      zip: '02101',
+      postalCode: '02101',
+      country: 'US',
     },
   };
 
@@ -25,12 +26,15 @@ describe('AddressChangeHandler', () => {
 
     expect(result.success).toBe(true);
     expect(result.message).toContain('EMP-002');
+    expect(result.message).toContain('123 Main St');
+    expect(result.message).toContain('Boston');
     expect(result.processedAt).toBeDefined();
     expect(result.data).toEqual({
       street: '123 Main St',
       city: 'Boston',
-      state: 'MA',
-      zip: '02101',
+      postalCode: '02101',
+      country: 'US',
+      effectiveDate: '2026-02-01',
     });
   });
 

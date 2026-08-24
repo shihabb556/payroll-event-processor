@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payroll Event Processor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Payroll Event Processor</h1>
+    <nav>
+      <a href="#submit" class="nav-link active" data-tab="submit">Submit Event</a>
+      <a href="#events" class="nav-link" data-tab="events">Events</a>
+      <a href="/api-docs" target="_blank" class="nav-link">API Docs</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Submit Event Tab -->
+    <section id="submit-tab" class="tab-content active">
+      <h2>Submit Payroll Event</h2>
+      <form id="event-form">
+        <div class="form-group">
+          <label for="employeeId">Employee ID</label>
+          <input type="text" id="employeeId" name="employeeId" placeholder="EMP-001" required>
+        </div>
+
+        <div class="form-group">
+          <label for="eventType">Event Type</label>
+          <select id="eventType" name="eventType" required>
+            <option value="">Select event type...</option>
+            <option value="SALARY_CHANGE">SALARY_CHANGE</option>
+            <option value="ADDRESS_CHANGE">ADDRESS_CHANGE</option>
+            <option value="BANK_ACCOUNT_CHANGE">BANK_ACCOUNT_CHANGE</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="idempotencyKey">Idempotency Key</label>
+          <input type="text" id="idempotencyKey" name="idempotencyKey" placeholder="Auto-generated if empty">
+          <button type="button" id="generate-key" class="btn-small">Generate</button>
+        </div>
+
+        <!-- Dynamic payload fields -->
+        <div id="payload-fields"></div>
+
+        <button type="submit" class="btn-primary" id="submit-btn">Submit Event</button>
+      </form>
+
+      <div id="submit-result" class="result-box hidden"></div>
+    </section>
+
+    <!-- Events List Tab -->
+    <section id="events-tab" class="tab-content">
+      <h2>Events</h2>
+      <div class="events-header">
+        <button id="refresh-btn" class="btn-small">Refresh</button>
+        <label><input type="checkbox" id="auto-refresh" checked> Auto-refresh (2s)</label>
+      </div>
+      <div id="events-list" class="events-list">
+        <p class="loading">Loading events...</p>
+      </div>
+    </section>
+
+    <!-- Event Detail Modal -->
+    <div id="event-modal" class="modal hidden">
+      <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <div id="event-detail"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

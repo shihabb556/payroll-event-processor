@@ -5,21 +5,25 @@ export enum EventType {
 }
 
 export interface SalaryChangePayload {
-  salary: number;
+  effectiveDate: string;
+  newSalary: number;
+  currency: string;
 }
 
 export interface AddressChangePayload {
+  effectiveDate: string;
   street: string;
   city: string;
-  state: string;
-  zip: string;
+  postalCode: string;
+  country: string;
 }
 
 export interface BankAccountChangePayload {
-  accountNumber: string;
-  routingNumber: string;
-  bankName: string;
+  effectiveDate: string;
+  iban: string;
 }
 
 export type EventPayload =
-  SalaryChangePayload | AddressChangePayload | BankAccountChangePayload;
+  | SalaryChangePayload
+  | AddressChangePayload
+  | BankAccountChangePayload;

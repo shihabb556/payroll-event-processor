@@ -32,6 +32,14 @@ export class EventsRepository {
     return event;
   }
 
+  async findAll(limit: number) {
+    return this.database.db
+      .select()
+      .from(events)
+      .orderBy(sql`${events.createdAt} DESC`)
+      .limit(limit);
+  }
+
   async findById(id: string) {
     const [event] = await this.database.db
       .select()

@@ -28,20 +28,19 @@ export class BankAccountChangeHandler implements EventHandler {
       });
     }
 
-    const accountNumber = event.payload.accountNumber as string;
-    const routingNumber = event.payload.routingNumber as string;
-    const bankName = event.payload.bankName as string;
+    const iban = event.payload.iban as string;
+    const effectiveDate = event.payload.effectiveDate as string;
+
+    // Mask IBAN for safety — show only last 4 characters
+    const maskedIban = iban.length > 4 ? `****${iban.slice(-4)}` : iban;
 
     return Promise.resolve({
       success: true,
-      message: `Bank account updated successfully for employee ${event.employeeId}`,
+      message: `Bank account updated to ${maskedIban} for employee ${event.employeeId} (effective ${effectiveDate})`,
       processedAt: new Date().toISOString(),
       data: {
-        accountNumber: accountNumber
-          ? `****${accountNumber.slice(-4)}`
-          : undefined,
-        routingNumber,
-        bankName,
+        iban: maskedIban,
+        effectiveDate,
       },
     });
   }

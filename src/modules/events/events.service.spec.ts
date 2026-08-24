@@ -27,7 +27,7 @@ describe('EventsService', () => {
     id: '550e8400-e29b-41d4-a716-446655440000',
     employeeId: 'EMP-001',
     eventType: EventType.SALARY_CHANGE,
-    payload: { salary: 50000 },
+    payload: { effectiveDate: '2026-01-15', newSalary: 75000, currency: 'USD' },
     status: 'PENDING' as const,
     sequence: 1,
     idempotencyKey: 'salary-change-emp001-001',
@@ -71,7 +71,7 @@ describe('EventsService', () => {
       employeeId: 'EMP-001',
       eventType: EventType.SALARY_CHANGE,
       idempotencyKey: 'key-001',
-      payload: { salary: 50000 },
+      payload: { effectiveDate: '2026-01-15', newSalary: 75000, currency: 'USD' },
     };
 
     it('should create event with sequence and enqueue job', async () => {

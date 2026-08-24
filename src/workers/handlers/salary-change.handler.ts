@@ -28,14 +28,18 @@ export class SalaryChangeHandler implements EventHandler {
       });
     }
 
-    const salary = event.payload.salary as number;
+    const newSalary = event.payload.newSalary as number;
+    const currency = event.payload.currency as string;
+    const effectiveDate = event.payload.effectiveDate as string;
 
     return Promise.resolve({
       success: true,
-      message: `Salary updated successfully for employee ${event.employeeId}`,
+      message: `Salary updated to ${newSalary} ${currency} for employee ${event.employeeId} (effective ${effectiveDate})`,
       processedAt: new Date().toISOString(),
       data: {
-        salary,
+        newSalary,
+        currency,
+        effectiveDate,
       },
     });
   }

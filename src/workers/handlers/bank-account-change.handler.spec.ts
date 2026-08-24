@@ -9,9 +9,8 @@ describe('BankAccountChangeHandler', () => {
     employeeId: 'EMP-001',
     eventType: 'BANK_ACCOUNT_CHANGE',
     payload: {
-      accountNumber: '1234567890',
-      routingNumber: '021000021',
-      bankName: 'Chase',
+      effectiveDate: '2026-03-01',
+      iban: 'DE89370400440532013000',
     },
   };
 
@@ -24,11 +23,11 @@ describe('BankAccountChangeHandler', () => {
 
     expect(result.success).toBe(true);
     expect(result.message).toContain('EMP-001');
+    expect(result.message).toContain('3000');
     expect(result.processedAt).toBeDefined();
     expect(result.data).toEqual({
-      accountNumber: '****7890',
-      routingNumber: '021000021',
-      bankName: 'Chase',
+      iban: '****3000',
+      effectiveDate: '2026-03-01',
     });
   });
 

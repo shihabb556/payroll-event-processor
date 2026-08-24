@@ -41,7 +41,7 @@ describe('PayrollEventProcessor', () => {
     id: '550e8400-e29b-41d4-a716-446655440000',
     employeeId: 'EMP-001',
     eventType: 'SALARY_CHANGE',
-    payload: { salary: 50000 },
+    payload: { effectiveDate: '2026-01-15', newSalary: 75000, currency: 'USD' },
     status: 'PENDING' as const,
     sequence: 1,
     idempotencyKey: 'key-001',
@@ -59,9 +59,8 @@ describe('PayrollEventProcessor', () => {
     id: '660e8400-e29b-41d4-a716-446655440001',
     eventType: 'BANK_ACCOUNT_CHANGE',
     payload: {
-      accountNumber: '1234567890',
-      routingNumber: '021000021',
-      bankName: 'Chase',
+      effectiveDate: '2026-03-01',
+      iban: 'DE89370400440532013000',
     },
   };
 
@@ -71,10 +70,11 @@ describe('PayrollEventProcessor', () => {
     employeeId: 'EMP-002',
     eventType: 'ADDRESS_CHANGE',
     payload: {
+      effectiveDate: '2026-02-01',
       street: '123 Main St',
       city: 'Boston',
-      state: 'MA',
-      zip: '02101',
+      postalCode: '02101',
+      country: 'US',
     },
   };
 
@@ -532,7 +532,7 @@ describe('PayrollEventProcessor', () => {
       expect(result.success).toBe(true);
       expect(typeof result.message).toBe('string');
       expect(typeof result.processedAt).toBe('string');
-      expect(result.data).toEqual({ salary: 50000 });
+      expect(result.data).toEqual({ newSalary: 75000, currency: 'USD', effectiveDate: '2026-01-15' });
     });
 
     it('should persist failure reason on permanent failure', async () => {

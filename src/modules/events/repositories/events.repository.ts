@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, lt, sql } from 'drizzle-orm';
 
 import { DatabaseService } from '../../../infrastructure/database/database.service';
 import { events } from '../../../infrastructure/database/schema/events.schema';
@@ -14,6 +14,7 @@ export class EventsRepository {
     eventType: EventType;
     idempotencyKey: string;
     payload: Record<string, unknown>;
+    sequence: number;
   }) {
     const [event] = await this.database.db
       .insert(events)
@@ -24,6 +25,7 @@ export class EventsRepository {
         payload: data.payload,
         status: 'PENDING',
         attemptCount: 0,
+        sequence: data.sequence,
       })
       .returning();
 
@@ -131,5 +133,32 @@ export class EventsRepository {
 
   async delete(id: string) {
     await this.database.db.delete(events).where(eq(events.id, id));
+  }
+
+  /**
+   * Check if there are any unprocessed prior events for the same employee.
+   * "Unprocessed" means events with sequence < this sequence that are
+   * not in a terminal state (SUCCESS or FAILED).
+   *
+   * Returns true if earlier events are still pending/processing (ordering blocked).
+   * Returns false if all earlier events are done (safe to process).
+   */
+  async hasUnprocessedPriorEvents(
+    employeeId: string,
+    sequence: number,
+  ): Promise<boolean> {
+    const [row] = await this.database.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(events)
+      .where(
+        and(
+          eq(events.employeeId, employeeId),
+          lt(events.sequence, sequence),
+          sql`${events.status} NOT IN ('SUCCESS', 'FAILED')`,
+        ),
+      )
+      .limit(1);
+
+    return (row?.count ?? 0) > 0;
   }
 }

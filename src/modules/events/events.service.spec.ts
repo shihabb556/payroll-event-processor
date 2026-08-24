@@ -3,6 +3,7 @@ import { HttpException } from '@nestjs/common';
 
 import { EventsService } from './events.service';
 import { EventsRepository } from './repositories/events.repository';
+import { EmployeeSequencesRepository } from './repositories/employee-sequences.repository';
 import { PayrollEventQueue } from '../../infrastructure/queue/payroll-event.queue';
 import { EventType } from './types/event-payload.types';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -15,6 +16,9 @@ describe('EventsService', () => {
     findByIdempotencyKey: jest.Mock;
     delete: jest.Mock;
   };
+  let sequenceRepo: {
+    allocateSequence: jest.Mock;
+  };
   let queue: {
     addEventJob: jest.Mock;
   };
@@ -25,6 +29,7 @@ describe('EventsService', () => {
     eventType: EventType.SALARY_CHANGE,
     payload: { salary: 50000 },
     status: 'PENDING' as const,
+    sequence: 1,
     idempotencyKey: 'salary-change-emp001-001',
     attemptCount: 0,
     failureReason: null,
@@ -42,6 +47,9 @@ describe('EventsService', () => {
       findByIdempotencyKey: jest.fn(),
       delete: jest.fn(),
     };
+    sequenceRepo = {
+      allocateSequence: jest.fn(),
+    };
     queue = {
       addEventJob: jest.fn(),
     };
@@ -50,6 +58,7 @@ describe('EventsService', () => {
       providers: [
         EventsService,
         { provide: EventsRepository, useValue: repository },
+        { provide: EmployeeSequencesRepository, useValue: sequenceRepo },
         { provide: PayrollEventQueue, useValue: queue },
       ],
     }).compile();
@@ -65,8 +74,9 @@ describe('EventsService', () => {
       payload: { salary: 50000 },
     };
 
-    it('should create event and enqueue job', async () => {
+    it('should create event with sequence and enqueue job', async () => {
       repository.findByIdempotencyKey.mockResolvedValueOnce(null);
+      sequenceRepo.allocateSequence.mockResolvedValueOnce(1);
       repository.create.mockResolvedValueOnce(mockEvent);
       queue.addEventJob.mockResolvedValueOnce(undefined);
 
@@ -74,11 +84,15 @@ describe('EventsService', () => {
 
       expect(result.alreadyExists).toBe(false);
       expect(result.event.id).toBe(mockEvent.id);
+      expect(sequenceRepo.allocateSequence).toHaveBeenCalledWith(
+        dto.employeeId,
+      );
       expect(repository.create).toHaveBeenCalledWith({
         employeeId: dto.employeeId,
         eventType: dto.eventType,
         idempotencyKey: dto.idempotencyKey,
         payload: dto.payload,
+        sequence: 1,
       });
       expect(queue.addEventJob).toHaveBeenCalledWith(mockEvent.id);
     });
@@ -90,12 +104,14 @@ describe('EventsService', () => {
 
       expect(result.alreadyExists).toBe(true);
       expect(result.event.id).toBe(mockEvent.id);
+      expect(sequenceRepo.allocateSequence).not.toHaveBeenCalled();
       expect(repository.create).not.toHaveBeenCalled();
       expect(queue.addEventJob).not.toHaveBeenCalled();
     });
 
     it('should delete event and throw if queue enqueue fails', async () => {
       repository.findByIdempotencyKey.mockResolvedValueOnce(null);
+      sequenceRepo.allocateSequence.mockResolvedValueOnce(1);
       repository.create.mockResolvedValueOnce(mockEvent);
       queue.addEventJob.mockRejectedValueOnce(new Error('Redis down'));
 
@@ -105,6 +121,7 @@ describe('EventsService', () => {
 
     it('should return existing event on unique constraint violation', async () => {
       repository.findByIdempotencyKey.mockResolvedValueOnce(null);
+      sequenceRepo.allocateSequence.mockResolvedValueOnce(1);
       repository.create.mockRejectedValueOnce(new Error('unique_violation'));
       repository.findByIdempotencyKey.mockResolvedValueOnce(mockEvent);
 

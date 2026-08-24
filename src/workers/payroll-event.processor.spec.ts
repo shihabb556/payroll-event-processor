@@ -29,6 +29,7 @@ describe('PayrollEventProcessor', () => {
     markSuccess: jest.Mock;
     markFailed: jest.Mock;
     incrementAttemptCount: jest.Mock;
+    hasUnprocessedPriorEvents: jest.Mock;
   };
   let attemptRepository: {
     recordAttempt: jest.Mock;
@@ -42,6 +43,7 @@ describe('PayrollEventProcessor', () => {
     eventType: 'SALARY_CHANGE',
     payload: { salary: 50000 },
     status: 'PENDING' as const,
+    sequence: 1,
     idempotencyKey: 'key-001',
     attemptCount: 0,
     failureReason: null,
@@ -84,6 +86,7 @@ describe('PayrollEventProcessor', () => {
       markSuccess: jest.fn(),
       markFailed: jest.fn(),
       incrementAttemptCount: jest.fn(),
+      hasUnprocessedPriorEvents: jest.fn(),
     };
 
     attemptRepository = {
@@ -183,6 +186,7 @@ describe('PayrollEventProcessor', () => {
   describe('successful event processing', () => {
     it('should process salary change and mark SUCCESS', async () => {
       repository.findById.mockResolvedValue(mockEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockEvent,
         status: 'PROCESSING',
@@ -211,6 +215,7 @@ describe('PayrollEventProcessor', () => {
 
     it('should process bank account change and mark SUCCESS', async () => {
       repository.findById.mockResolvedValue(mockBankEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockBankEvent,
         status: 'PROCESSING',
@@ -234,6 +239,7 @@ describe('PayrollEventProcessor', () => {
 
     it('should process address change and mark SUCCESS', async () => {
       repository.findById.mockResolvedValue(mockAddressEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockAddressEvent,
         status: 'PROCESSING',
@@ -260,6 +266,7 @@ describe('PayrollEventProcessor', () => {
     it('should mark event as FAILED and not throw for unknown type', async () => {
       const unknownTypeEvent = { ...mockEvent, eventType: 'UNKNOWN_TYPE' };
       repository.findById.mockResolvedValue(unknownTypeEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...unknownTypeEvent,
         status: 'PROCESSING',
@@ -323,6 +330,7 @@ describe('PayrollEventProcessor', () => {
   describe('processing claim', () => {
     it('should claim event and process it', async () => {
       repository.findById.mockResolvedValue(mockEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockEvent,
         status: 'PROCESSING',
@@ -345,6 +353,7 @@ describe('PayrollEventProcessor', () => {
     it('should handle retry scenario when event is already PROCESSING', async () => {
       const processingEvent = { ...mockEvent, status: 'PROCESSING' as const };
       repository.findById.mockResolvedValue(processingEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue(null); // Claim fails — already PROCESSING
       repository.reClaimEvent.mockResolvedValue(processingEvent);
       repository.incrementAttemptCount.mockResolvedValue({
@@ -366,6 +375,7 @@ describe('PayrollEventProcessor', () => {
     it('should skip if event is in unexpected state', async () => {
       const weirdEvent = { ...mockEvent, status: 'PROCESSING' as const };
       repository.findById.mockResolvedValue(weirdEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue(null);
       repository.reClaimEvent.mockResolvedValue(null); // reClaim also fails
 
@@ -382,6 +392,7 @@ describe('PayrollEventProcessor', () => {
       handler.simulateFailure = FailureType.TEMPORARY;
 
       repository.findById.mockResolvedValue(mockEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockEvent,
         status: 'PROCESSING',
@@ -407,6 +418,7 @@ describe('PayrollEventProcessor', () => {
       handler.simulateFailure = FailureType.TEMPORARY;
 
       repository.findById.mockResolvedValue(mockEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockEvent,
         status: 'PROCESSING',
@@ -438,6 +450,7 @@ describe('PayrollEventProcessor', () => {
       handler.simulateFailure = FailureType.PERMANENT;
 
       repository.findById.mockResolvedValue(mockEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockEvent,
         status: 'PROCESSING',
@@ -468,6 +481,7 @@ describe('PayrollEventProcessor', () => {
       handler.simulateFailure = FailureType.PERMANENT;
 
       repository.findById.mockResolvedValue(mockEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockEvent,
         status: 'PROCESSING',
@@ -494,6 +508,7 @@ describe('PayrollEventProcessor', () => {
   describe('processing result persistence', () => {
     it('should persist result with success=true and processing data', async () => {
       repository.findById.mockResolvedValue(mockEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockEvent,
         status: 'PROCESSING',
@@ -525,6 +540,7 @@ describe('PayrollEventProcessor', () => {
       handler.simulateFailure = FailureType.PERMANENT;
 
       repository.findById.mockResolvedValue(mockEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockEvent,
         status: 'PROCESSING',
@@ -554,6 +570,7 @@ describe('PayrollEventProcessor', () => {
   describe('attempt history', () => {
     it('should record attempt start before processing', async () => {
       repository.findById.mockResolvedValue(mockEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockEvent,
         status: 'PROCESSING',
@@ -584,6 +601,7 @@ describe('PayrollEventProcessor', () => {
 
     it('should record attempt result on success', async () => {
       repository.findById.mockResolvedValue(mockEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockEvent,
         status: 'PROCESSING',
@@ -615,6 +633,7 @@ describe('PayrollEventProcessor', () => {
     it('should track attempt number correctly across retries', async () => {
       const processingEvent = { ...mockEvent, status: 'PROCESSING' as const };
       repository.findById.mockResolvedValue(processingEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue(null); // Already PROCESSING
       repository.reClaimEvent.mockResolvedValue(processingEvent);
       repository.incrementAttemptCount.mockResolvedValue({
@@ -644,6 +663,7 @@ describe('PayrollEventProcessor', () => {
     it('should only one worker claim and process via atomic claim', async () => {
       // First worker claims successfully
       repository.findById.mockResolvedValue(mockEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
       repository.claimEvent.mockResolvedValue({
         ...mockEvent,
         status: 'PROCESSING',
@@ -662,6 +682,124 @@ describe('PayrollEventProcessor', () => {
 
       expect(repository.claimEvent).toHaveBeenCalledTimes(1);
       expect(repository.markSuccess).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('per-employee ordering', () => {
+    it('should skip ordering check for first event (sequence=1)', async () => {
+      repository.findById.mockResolvedValue(mockEvent);
+      repository.claimEvent.mockResolvedValue({
+        ...mockEvent,
+        status: 'PROCESSING',
+      });
+      repository.incrementAttemptCount.mockResolvedValue({
+        ...mockEvent,
+        attemptCount: 1,
+      });
+      attemptRepository.recordAttempt.mockResolvedValue({});
+      repository.markSuccess.mockResolvedValue({
+        ...mockEvent,
+        status: 'SUCCESS',
+      });
+
+      await runProcessJob(mockEvent.id);
+
+      // hasUnprocessedPriorEvents should NOT be called for sequence=1
+      expect(repository.hasUnprocessedPriorEvents).not.toHaveBeenCalled();
+    });
+
+    it('should defer processing when earlier events are still pending', async () => {
+      const laterEvent = { ...mockEvent, sequence: 3 };
+      repository.findById.mockResolvedValue(laterEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(true);
+
+      await expect(runProcessJob(laterEvent.id)).rejects.toThrow(
+        /Ordering constraint/,
+      );
+
+      // Should NOT claim or process
+      expect(repository.claimEvent).not.toHaveBeenCalled();
+      expect(repository.markSuccess).not.toHaveBeenCalled();
+      expect(repository.markFailed).not.toHaveBeenCalled();
+    });
+
+    it('should process when all earlier events are done', async () => {
+      const laterEvent = { ...mockEvent, sequence: 3 };
+      repository.findById.mockResolvedValue(laterEvent);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
+      repository.claimEvent.mockResolvedValue({
+        ...laterEvent,
+        status: 'PROCESSING',
+      });
+      repository.incrementAttemptCount.mockResolvedValue({
+        ...laterEvent,
+        attemptCount: 1,
+      });
+      attemptRepository.recordAttempt.mockResolvedValue({});
+      repository.markSuccess.mockResolvedValue({
+        ...laterEvent,
+        status: 'SUCCESS',
+      });
+
+      await runProcessJob(laterEvent.id);
+
+      expect(repository.hasUnprocessedPriorEvents).toHaveBeenCalledWith(
+        mockEvent.employeeId,
+        3,
+      );
+      expect(repository.claimEvent).toHaveBeenCalled();
+      expect(repository.markSuccess).toHaveBeenCalled();
+    });
+
+    it('should allow different employees to process concurrently', async () => {
+      // Employee B's first event (sequence=1) should not be blocked by Employee A
+      repository.findById.mockResolvedValue(mockAddressEvent); // EMP-002, seq 1
+      repository.claimEvent.mockResolvedValue({
+        ...mockAddressEvent,
+        status: 'PROCESSING',
+      });
+      repository.incrementAttemptCount.mockResolvedValue({
+        ...mockAddressEvent,
+        attemptCount: 1,
+      });
+      attemptRepository.recordAttempt.mockResolvedValue({});
+      repository.markSuccess.mockResolvedValue({
+        ...mockAddressEvent,
+        status: 'SUCCESS',
+      });
+
+      await runProcessJob(mockAddressEvent.id);
+
+      // No ordering check needed for sequence=1
+      expect(repository.hasUnprocessedPriorEvents).not.toHaveBeenCalled();
+      expect(repository.markSuccess).toHaveBeenCalled();
+    });
+
+    it('should check ordering only for same employee', async () => {
+      // Employee B's second event should only check Employee B's earlier events
+      const empBEvent2 = { ...mockAddressEvent, sequence: 2 };
+      repository.findById.mockResolvedValue(empBEvent2);
+      repository.hasUnprocessedPriorEvents.mockResolvedValue(false);
+      repository.claimEvent.mockResolvedValue({
+        ...empBEvent2,
+        status: 'PROCESSING',
+      });
+      repository.incrementAttemptCount.mockResolvedValue({
+        ...empBEvent2,
+        attemptCount: 1,
+      });
+      attemptRepository.recordAttempt.mockResolvedValue({});
+      repository.markSuccess.mockResolvedValue({
+        ...empBEvent2,
+        status: 'SUCCESS',
+      });
+
+      await runProcessJob(empBEvent2.id);
+
+      expect(repository.hasUnprocessedPriorEvents).toHaveBeenCalledWith(
+        'EMP-002',
+        2,
+      );
     });
   });
 });

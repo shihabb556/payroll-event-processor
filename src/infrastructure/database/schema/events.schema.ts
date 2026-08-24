@@ -7,6 +7,7 @@ import {
   jsonb,
   integer,
   uniqueIndex,
+  index,
 } from 'drizzle-orm/pg-core';
 
 export const eventTypeEnum = pgEnum('event_type', [
@@ -37,6 +38,8 @@ export const events = pgTable(
 
     idempotencyKey: text('idempotency_key').notNull(),
 
+    sequence: integer('sequence').notNull().default(0),
+
     attemptCount: integer('attempt_count').notNull().default(0),
 
     failureReason: text('failure_reason'),
@@ -54,6 +57,14 @@ export const events = pgTable(
   (table) => ({
     idempotencyKeyUnique: uniqueIndex('events_idempotency_key_unique').on(
       table.idempotencyKey,
+    ),
+    employeeSequenceIndex: uniqueIndex('events_employee_sequence_unique').on(
+      table.employeeId,
+      table.sequence,
+    ),
+    employeeStatusIndex: index('events_employee_status_idx').on(
+      table.employeeId,
+      table.status,
     ),
   }),
 );

@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 
 import { PayrollEventQueue } from '../../infrastructure/queue/payroll-event.queue';
 import { CreateEventDto } from './dto/create-event.dto';
+import { EmployeeSequencesRepository } from './repositories/employee-sequences.repository';
 import { EventsRepository } from './repositories/events.repository';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class EventsService {
 
   constructor(
     private readonly eventsRepository: EventsRepository,
+    private readonly employeeSequencesRepository: EmployeeSequencesRepository,
     private readonly payrollEventQueue: PayrollEventQueue,
   ) {}
 
@@ -29,11 +31,17 @@ export class EventsService {
     // Try to create the event.
     // The unique constraint on idempotencyKey handles concurrent duplicates.
     try {
+      // Allocate a deterministic per-employee sequence number
+      const sequence = await this.employeeSequencesRepository.allocateSequence(
+        dto.employeeId,
+      );
+
       const event = await this.eventsRepository.create({
         employeeId: dto.employeeId,
         eventType: dto.eventType,
         idempotencyKey: dto.idempotencyKey,
         payload: dto.payload,
+        sequence,
       });
 
       // Enqueue the job. If this fails, clean up the event.

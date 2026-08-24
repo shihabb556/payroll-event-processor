@@ -107,6 +107,25 @@ export class PayrollEventProcessor implements OnModuleDestroy {
       return;
     }
 
+    // Per-employee ordering: check if earlier events for this employee are still pending/processing
+    if (event.sequence > 1) {
+      const hasPrior = await this.eventsRepository.hasUnprocessedPriorEvents(
+        event.employeeId,
+        event.sequence,
+      );
+
+      if (hasPrior) {
+        this.logger.log(
+          `Event ${eventId} (employee ${event.employeeId}, seq ${event.sequence}) deferred: earlier events still processing`,
+        );
+        // Throw so BullMQ retries later with backoff.
+        // Do NOT mark as FAILED — this is a temporary ordering block.
+        throw new Error(
+          `Ordering constraint: earlier events for employee ${event.employeeId} still processing`,
+        );
+      }
+    }
+
     // Processing claim: atomically transition PENDING → PROCESSING
     const claimed = await this.eventsRepository.claimEvent(eventId);
 

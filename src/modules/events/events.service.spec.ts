@@ -11,7 +11,6 @@ describe('EventsService', () => {
   let service: EventsService;
   let repository: {
     create: jest.Mock;
-    createWithConflictHandling: jest.Mock;
     findById: jest.Mock;
     findByIdempotencyKey: jest.Mock;
     delete: jest.Mock;
@@ -39,7 +38,6 @@ describe('EventsService', () => {
   beforeEach(async () => {
     repository = {
       create: jest.fn(),
-      createWithConflictHandling: jest.fn(),
       findById: jest.fn(),
       findByIdempotencyKey: jest.fn(),
       delete: jest.fn(),
@@ -105,7 +103,7 @@ describe('EventsService', () => {
       expect(repository.delete).toHaveBeenCalledWith(mockEvent.id);
     });
 
-    it('should return existing event on duplicate constraint violation', async () => {
+    it('should return existing event on unique constraint violation', async () => {
       repository.findByIdempotencyKey.mockResolvedValueOnce(null);
       repository.create.mockRejectedValueOnce(new Error('unique_violation'));
       repository.findByIdempotencyKey.mockResolvedValueOnce(mockEvent);

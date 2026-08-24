@@ -2,8 +2,10 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Worker, Job } from 'bullmq';
 
+import { PermanentProcessingError } from '../common/errors';
 import { RedisService } from '../infrastructure/redis/redis.service';
 import { PAYROLL_EVENT_QUEUE } from '../infrastructure/queue/queue.constants';
+import { EventAttemptsRepository } from '../modules/events/repositories/event-attempts.repository';
 import { EventsRepository } from '../modules/events/repositories/events.repository';
 import { EventHandlerResolver } from './handlers/event-handler.resolver';
 
@@ -18,6 +20,7 @@ export class PayrollEventProcessor implements OnModuleDestroy {
 
   constructor(
     private readonly eventsRepository: EventsRepository,
+    private readonly eventAttemptsRepository: EventAttemptsRepository,
     private readonly eventHandlerResolver: EventHandlerResolver,
     private readonly redis: RedisService,
     private readonly config: ConfigService,
@@ -44,9 +47,30 @@ export class PayrollEventProcessor implements OnModuleDestroy {
 
     this.worker.on('failed', (job, err) => {
       const data = job?.data as PayrollJobData | undefined;
-      this.logger.error(
-        `Job ${job?.id} failed for event ${data?.eventId}: ${err.message}`,
-      );
+
+      if (!job || !data) {
+        this.logger.error(`Job failed with no data: ${err.message}`);
+        return;
+      }
+
+      const retriesExhausted = job.attemptsMade >= (job.opts.attempts ?? 1);
+
+      if (retriesExhausted) {
+        this.logger.error(
+          `Job ${job.id} exhausted all retries for event ${data.eventId}: ${err.message}`,
+        );
+        this.eventsRepository
+          .markFailed(data.eventId, err.message)
+          .catch((markErr) => {
+            this.logger.error(
+              `Failed to mark event ${data.eventId} as FAILED after retry exhaustion: ${markErr instanceof Error ? markErr.message : String(markErr)}`,
+            );
+          });
+      } else {
+        this.logger.warn(
+          `Job ${job.id} failed for event ${data.eventId} (attempt ${job.attemptsMade}/${job.opts.attempts ?? 'unknown'}): ${err.message}`,
+        );
+      }
     });
 
     this.logger.log(
@@ -56,10 +80,10 @@ export class PayrollEventProcessor implements OnModuleDestroy {
 
   private async processJob(job: Job<PayrollJobData>): Promise<void> {
     const eventId: string = job.data.eventId;
-    const attempt = job.attemptsMade + 1;
+    const attemptNumber = job.attemptsMade + 1;
 
     this.logger.log(
-      `Processing job ${job.id} for event ${eventId} (attempt ${attempt})`,
+      `Processing job ${job.id} for event ${eventId} (attempt ${attemptNumber})`,
     );
 
     const event = await this.eventsRepository.findById(eventId);
@@ -69,6 +93,7 @@ export class PayrollEventProcessor implements OnModuleDestroy {
       throw new Error(`Event ${eventId} not found`);
     }
 
+    // Idempotency: if already SUCCESS, skip processing entirely
     if (event.status === 'SUCCESS') {
       this.logger.log(
         `Event ${eventId} already processed successfully, skipping`,
@@ -76,8 +101,44 @@ export class PayrollEventProcessor implements OnModuleDestroy {
       return;
     }
 
-    await this.eventsRepository.markProcessing(eventId);
+    // Idempotency: if already FAILED, do not re-process
+    if (event.status === 'FAILED') {
+      this.logger.log(`Event ${eventId} already permanently failed, skipping`);
+      return;
+    }
+
+    // Processing claim: atomically transition PENDING → PROCESSING
+    const claimed = await this.eventsRepository.claimEvent(eventId);
+
+    if (!claimed) {
+      // Event was not PENDING — check if already PROCESSING (retry scenario)
+      if (event.status === 'PROCESSING') {
+        this.logger.log(
+          `Event ${eventId} already PROCESSING, proceeding with retry`,
+        );
+        const reClaimed = await this.eventsRepository.reClaimEvent(eventId);
+        if (!reClaimed) {
+          this.logger.error(`Event ${eventId} failed to re-claim, skipping`);
+          return;
+        }
+      } else {
+        // Unexpected state — should not happen
+        this.logger.error(
+          `Event ${eventId} in unexpected state: ${event.status}`,
+        );
+        return;
+      }
+    }
+
+    // Increment attempt count
     await this.eventsRepository.incrementAttemptCount(eventId);
+
+    // Record attempt start
+    await this.eventAttemptsRepository.recordAttempt({
+      eventId,
+      attemptNumber,
+      status: 'FAILED', // Will be updated on completion
+    });
 
     const handler = this.eventHandlerResolver.resolve(event.eventType);
 
@@ -85,7 +146,14 @@ export class PayrollEventProcessor implements OnModuleDestroy {
       const errorMsg = `No handler found for event type: ${event.eventType}`;
       this.logger.error(errorMsg);
       await this.eventsRepository.markFailed(eventId, errorMsg);
-      throw new Error(errorMsg);
+      await this.eventAttemptsRepository.recordAttempt({
+        eventId,
+        attemptNumber,
+        status: 'FAILED',
+        failureReason: errorMsg,
+        completedAt: new Date(),
+      });
+      return;
     }
 
     try {
@@ -101,22 +169,57 @@ export class PayrollEventProcessor implements OnModuleDestroy {
           eventId,
           result as unknown as Record<string, unknown>,
         );
+        await this.eventAttemptsRepository.recordAttempt({
+          eventId,
+          attemptNumber,
+          status: 'SUCCESS',
+        });
         this.logger.log(
           `Event ${eventId} processed successfully: ${result.message}`,
         );
       } else {
+        // Permanent failure
         await this.eventsRepository.markFailed(eventId, result.message);
-        throw new Error(result.message);
+        await this.eventAttemptsRepository.recordAttempt({
+          eventId,
+          attemptNumber,
+          status: 'FAILED',
+          failureReason: result.message,
+        });
+        this.logger.warn(
+          `Event ${eventId} permanently failed: ${result.message}`,
+        );
       }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown processing error';
 
-      const existingEvent = await this.eventsRepository.findById(eventId);
-      if (existingEvent?.status === 'PROCESSING') {
+      // Determine if temporary or permanent
+      if (error instanceof PermanentProcessingError) {
         await this.eventsRepository.markFailed(eventId, message);
+        await this.eventAttemptsRepository.recordAttempt({
+          eventId,
+          attemptNumber,
+          status: 'FAILED',
+          failureReason: message,
+        });
+        this.logger.warn(
+          `Event ${eventId} permanently failed (attempt ${attemptNumber}): ${message}`,
+        );
+        // Don't throw — permanent failure, no BullMQ retry
+        return;
       }
 
+      // Temporary failure — record attempt and re-throw for BullMQ retry
+      await this.eventAttemptsRepository.recordAttempt({
+        eventId,
+        attemptNumber,
+        status: 'FAILED',
+        failureReason: message,
+      });
+      this.logger.warn(
+        `Event ${eventId} processing failed (attempt ${attemptNumber}): ${message}`,
+      );
       throw error;
     }
   }

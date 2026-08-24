@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 
 import { PayrollEventQueue } from '../../infrastructure/queue/payroll-event.queue';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -6,12 +6,15 @@ import { EventsRepository } from './repositories/events.repository';
 
 @Injectable()
 export class EventsService {
+  private readonly logger = new Logger(EventsService.name);
+
   constructor(
     private readonly eventsRepository: EventsRepository,
     private readonly payrollEventQueue: PayrollEventQueue,
   ) {}
 
   async createEvent(dto: CreateEventDto) {
+    // Fast path: check if event already exists (idempotency)
     const existingEvent = await this.eventsRepository.findByIdempotencyKey(
       dto.idempotencyKey,
     );
@@ -23,6 +26,8 @@ export class EventsService {
       };
     }
 
+    // Try to create the event.
+    // The unique constraint on idempotencyKey handles concurrent duplicates.
     try {
       const event = await this.eventsRepository.create({
         employeeId: dto.employeeId,
@@ -31,9 +36,13 @@ export class EventsService {
         payload: dto.payload,
       });
 
+      // Enqueue the job. If this fails, clean up the event.
       try {
         await this.payrollEventQueue.addEventJob(event.id);
-      } catch {
+      } catch (queueError) {
+        this.logger.error(
+          `Failed to enqueue event ${event.id}: ${queueError instanceof Error ? queueError.message : String(queueError)}`,
+        );
         await this.eventsRepository.delete(event.id);
         throw new HttpException(
           'Failed to enqueue event for processing',
@@ -50,6 +59,8 @@ export class EventsService {
         throw error;
       }
 
+      // Handle unique constraint violation (concurrent duplicate request)
+      // The database enforces uniqueness, so we fall back to finding the existing event.
       const duplicateEvent = await this.eventsRepository.findByIdempotencyKey(
         dto.idempotencyKey,
       );
@@ -61,6 +72,9 @@ export class EventsService {
         };
       }
 
+      this.logger.error(
+        `Failed to create event: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw new HttpException(
         'Failed to create event',
         HttpStatus.INTERNAL_SERVER_ERROR,

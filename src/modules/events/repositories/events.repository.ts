@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import { DatabaseService } from '../../../infrastructure/database/database.service';
 import { events } from '../../../infrastructure/database/schema/events.schema';
@@ -30,27 +30,6 @@ export class EventsRepository {
     return event;
   }
 
-  async createWithConflictHandling(data: {
-    employeeId: string;
-    eventType: EventType;
-    idempotencyKey: string;
-    payload: Record<string, unknown>;
-  }) {
-    await this.database.db
-      .insert(events)
-      .values({
-        employeeId: data.employeeId,
-        eventType: data.eventType,
-        idempotencyKey: data.idempotencyKey,
-        payload: data.payload,
-        status: 'PENDING',
-        attemptCount: 0,
-      })
-      .onConflictDoNothing();
-
-    return this.findByIdempotencyKey(data.idempotencyKey);
-  }
-
   async findById(id: string) {
     const [event] = await this.database.db
       .select()
@@ -71,11 +50,12 @@ export class EventsRepository {
     return event;
   }
 
-  async delete(id: string) {
-    await this.database.db.delete(events).where(eq(events.id, id));
-  }
-
-  async markProcessing(id: string) {
+  /**
+   * Atomically claim an event for processing.
+   * Transitions PENDING → PROCESSING.
+   * Returns the event if claim succeeded, null if already claimed.
+   */
+  async claimEvent(id: string) {
     const [event] = await this.database.db
       .update(events)
       .set({
@@ -83,10 +63,27 @@ export class EventsRepository {
         processingStartedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(events.id, id))
+      .where(and(eq(events.id, id), eq(events.status, 'PENDING')))
       .returning();
 
-    return event;
+    return event ?? null;
+  }
+
+  /**
+   * Re-claim an event that is already PROCESSING (for retries).
+   * Updates the processing timestamp.
+   */
+  async reClaimEvent(id: string) {
+    const [event] = await this.database.db
+      .update(events)
+      .set({
+        processingStartedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(events.id, id), eq(events.status, 'PROCESSING')))
+      .returning();
+
+    return event ?? null;
   }
 
   async markSuccess(id: string, result: Record<string, unknown>) {
@@ -130,5 +127,9 @@ export class EventsRepository {
       .returning();
 
     return event;
+  }
+
+  async delete(id: string) {
+    await this.database.db.delete(events).where(eq(events.id, id));
   }
 }

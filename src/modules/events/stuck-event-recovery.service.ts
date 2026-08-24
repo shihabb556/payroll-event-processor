@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { EventsRepository } from './repositories/events.repository';
@@ -8,9 +8,9 @@ const DEFAULT_RECOVERY_INTERVAL_MS = 30_000; // 30 seconds
 const DEFAULT_RECOVERY_BATCH_SIZE = 10;
 
 @Injectable()
-export class StuckEventRecoveryService implements OnModuleDestroy {
+export class StuckEventRecoveryService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(StuckEventRecoveryService.name);
-  private readonly intervalHandle: ReturnType<typeof setInterval>;
+  private intervalHandle: ReturnType<typeof setInterval> | undefined;
 
   private readonly processingTimeoutMs: number;
   private readonly recoveryIntervalMs: number;
@@ -29,7 +29,9 @@ export class StuckEventRecoveryService implements OnModuleDestroy {
     this.batchSize =
       this.config.get<number>('RECOVERY_BATCH_SIZE') ??
       DEFAULT_RECOVERY_BATCH_SIZE;
+  }
 
+  onModuleInit(): void {
     this.logger.log(
       `Stuck event recovery started: timeout=${this.processingTimeoutMs}ms, interval=${this.recoveryIntervalMs}ms, batchSize=${this.batchSize}`,
     );
@@ -37,14 +39,14 @@ export class StuckEventRecoveryService implements OnModuleDestroy {
     // Run an immediate check on startup, then on interval
     this.runRecovery().catch((err) => {
       this.logger.error(
-        `Initial recovery check failed: ${err instanceof Error ? err.message : String(err)}`,
+        `Initial recovery check failed: ${extractErrorMessage(err)}`,
       );
     });
 
     this.intervalHandle = setInterval(() => {
       this.runRecovery().catch((err) => {
         this.logger.error(
-          `Recovery check failed: ${err instanceof Error ? err.message : String(err)}`,
+          `Recovery check failed: ${extractErrorMessage(err)}`,
         );
       });
     }, this.recoveryIntervalMs);
@@ -87,7 +89,7 @@ export class StuckEventRecoveryService implements OnModuleDestroy {
         }
       } catch (err) {
         this.logger.error(
-          `Failed to recover event ${event.id}: ${err instanceof Error ? err.message : String(err)}`,
+          `Failed to recover event ${event.id}: ${extractErrorMessage(err)}`,
         );
       }
     }
@@ -99,4 +101,28 @@ export class StuckEventRecoveryService implements OnModuleDestroy {
     }
     this.logger.log('Stuck event recovery stopped');
   }
+}
+
+/**
+ * Extract a useful error message from the error chain.
+ * Drizzle wraps the real DB error as `cause`, so a top-level
+ * `.message` is often just "Failed query: <SQL>".
+ */
+function extractErrorMessage(err: unknown): string {
+  if (err && typeof err === 'object') {
+    const obj = err as Record<string, unknown>;
+
+    // Drizzle stores the original Postgres error in .cause
+    const cause = obj.cause;
+    if (cause && typeof cause === 'object' && 'message' in cause) {
+      const causeMsg = (cause as { message: string }).message;
+      return `${obj.message ?? 'Unknown error'} (cause: ${causeMsg})`;
+    }
+
+    if (typeof obj.message === 'string') {
+      return obj.message;
+    }
+  }
+
+  return String(err);
 }

@@ -61,7 +61,10 @@ describe('StuckEventRecoveryService', () => {
       StuckEventRecoveryService,
     );
 
-    // Wait for the constructor's initial async recovery to complete
+    // Start the service (was previously in constructor, now in onModuleInit)
+    service.onModuleInit();
+
+    // Wait for the initial async recovery to complete
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     return { service, repository };

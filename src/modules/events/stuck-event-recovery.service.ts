@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { EventsRepository } from './repositories/events.repository';
@@ -8,7 +13,9 @@ const DEFAULT_RECOVERY_INTERVAL_MS = 30_000; // 30 seconds
 const DEFAULT_RECOVERY_BATCH_SIZE = 10;
 
 @Injectable()
-export class StuckEventRecoveryService implements OnModuleInit, OnModuleDestroy {
+export class StuckEventRecoveryService
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(StuckEventRecoveryService.name);
   private intervalHandle: ReturnType<typeof setInterval> | undefined;
 
@@ -45,9 +52,7 @@ export class StuckEventRecoveryService implements OnModuleInit, OnModuleDestroy 
 
     this.intervalHandle = setInterval(() => {
       this.runRecovery().catch((err) => {
-        this.logger.error(
-          `Recovery check failed: ${extractErrorMessage(err)}`,
-        );
+        this.logger.error(`Recovery check failed: ${extractErrorMessage(err)}`);
       });
     }, this.recoveryIntervalMs);
   }
@@ -115,8 +120,10 @@ function extractErrorMessage(err: unknown): string {
     // Drizzle stores the original Postgres error in .cause
     const cause = obj.cause;
     if (cause && typeof cause === 'object' && 'message' in cause) {
-      const causeMsg = (cause as { message: string }).message;
-      return `${obj.message ?? 'Unknown error'} (cause: ${causeMsg})`;
+      const causeMsg = String((cause as { message: string }).message);
+      const mainMsg =
+        typeof obj.message === 'string' ? obj.message : 'Unknown error';
+      return `${mainMsg} (cause: ${causeMsg})`;
     }
 
     if (typeof obj.message === 'string') {

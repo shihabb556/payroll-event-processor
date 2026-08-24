@@ -4,6 +4,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -29,8 +30,8 @@ export const eventAttempts = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => ({
-    eventAttemptUnique: {
-      columns: [table.eventId, table.attemptNumber],
-    },
+    eventAttemptUnique: uniqueIndex(
+      'event_attempts_event_id_attempt_number_unique',
+    ).on(table.eventId, table.attemptNumber),
   }),
 );

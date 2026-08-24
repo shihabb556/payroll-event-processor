@@ -1,98 +1,281 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Payroll Event Processor
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+An event-driven payroll processing system built with NestJS, PostgreSQL, Redis, and BullMQ. Processes employee payroll events (salary changes, address changes, bank account changes) with per-employee ordering, idempotency, retry logic, and crash recovery.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Architecture Overview
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ pnpm install
+```
+POST /api/v1/events
+        │
+        ▼
+   Validation (class-validator)
+        │
+        ▼
+   Idempotency Check (idempotency_key unique constraint)
+        │
+        ▼
+   Sequence Assignment (per-employee atomic counter)
+        │
+        ▼
+   PostgreSQL (events table)
+        │
+        ▼
+   BullMQ Queue (payroll-events)
+        │
+        ▼
+   Redis (job broker)
+        │
+        ▼
+   Worker (PayrollEventProcessor)
+        │
+        ▼
+   Event Handler (per event type)
+        │
+        ▼
+   Processing + Status Update (PostgreSQL)
 ```
 
-## Compile and run the project
+## Technology Stack
+
+- **Runtime**: Node.js + TypeScript
+- **Framework**: NestJS
+- **Database**: PostgreSQL 16 (via Drizzle ORM + postgres.js)
+- **Queue**: BullMQ (backed by Redis)
+- **Cache/Broker**: Redis 7
+- **Validation**: class-validator + class-transformer
+- **Testing**: Jest
+
+## Prerequisites
+
+- Node.js >= 20
+- pnpm
+- Docker & Docker Compose
+
+## Environment Variables
+
+Create a `.env` file:
 
 ```bash
-# development
-$ pnpm run start
+# PostgreSQL
+DATABASE_URL=postgresql://payroll:payroll@localhost:5432/payroll
 
-# watch mode
-$ pnpm run start:dev
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
 
-# production mode
-$ pnpm run start:prod
+# Application
+PORT=3000
+
+# Queue (optional, defaults shown)
+QUEUE_NAME=payroll-events
+WORKER_CONCURRENCY=5
+
+# Recovery (optional, defaults shown)
+EVENT_PROCESSING_TIMEOUT_MS=60000
+RECOVERY_INTERVAL_MS=30000
+RECOVERY_BATCH_SIZE=10
 ```
 
-## Run tests
+## Getting Started
 
 ```bash
-# unit tests
-$ pnpm run test
+# 1. Start infrastructure
+docker compose up -d
 
-# e2e tests
-$ pnpm run test:e2e
+# 2. Install dependencies
+pnpm install
 
-# test coverage
-$ pnpm run test:cov
+# 3. Run database migrations
+pnpm db-migrate
+
+# 4. Start the application
+pnpm start:dev
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Database Migrations
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+# Generate migrations after schema changes
+pnpm db-generate
+
+# Apply pending migrations
+pnpm db-migrate
+
+# Open Drizzle Studio (visual DB browser)
+pnpm db-studio
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## API Endpoints
 
-## Resources
+### Create Event
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+POST /api/v1/events
+Content-Type: application/json
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```json
+{
+  "employeeId": "EMP-001",
+  "eventType": "SALARY_CHANGE",
+  "idempotencyKey": "salary-change-emp001-20260101",
+  "payload": {
+    "salary": 75000
+  }
+}
+```
 
-## Support
+**Response (201 Created):**
+```json
+{
+  "message": "Event created successfully",
+  "event": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "employeeId": "EMP-001",
+    "eventType": "SALARY_CHANGE",
+    "status": "PENDING",
+    "sequence": 1,
+    "idempotencyKey": "salary-change-emp001-20260101",
+    "createdAt": "2026-01-01T00:00:00.000Z"
+  }
+}
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+**Idempotent Response (201 Created):** Returns the existing event if the same `idempotencyKey` is used.
 
-## Stay in touch
+### Get Event
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```bash
+GET /api/v1/events/:id
+```
+
+**Response (200 OK):**
+```json
+{
+  "event": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "employeeId": "EMP-001",
+    "eventType": "SALARY_CHANGE",
+    "status": "SUCCESS",
+    "sequence": 1,
+    "idempotencyKey": "salary-change-emp001-20260101",
+    "payload": { "salary": 75000 },
+    "attemptCount": 1,
+    "failureReason": null,
+    "result": { "success": true, "message": "Salary updated", "data": { "salary": 75000 } },
+    "processingStartedAt": "2026-01-01T00:00:00.100Z",
+    "completedAt": "2026-01-01T00:00:00.200Z",
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.200Z",
+    "attempts": [
+      { "attemptNumber": 1, "status": "SUCCESS", "failureReason": null, "startedAt": "...", "completedAt": "..." }
+    ]
+  }
+}
+```
+
+### Health Check
+
+```bash
+GET /api/v1/health
+```
+
+```json
+{
+  "status": "ok",
+  "services": {
+    "database": "connected",
+    "redis": "connected"
+  },
+  "timestamp": "2026-01-01T00:00:00.000Z"
+}
+```
+
+## Event Types
+
+| Event Type | Description | Payload Fields |
+|---|---|---|
+| `SALARY_CHANGE` | Update employee salary | `salary: number` |
+| `ADDRESS_CHANGE` | Update employee address | `street, city, state, zip: string` |
+| `BANK_ACCOUNT_CHANGE` | Update employee bank account | `accountNumber, routingNumber, bankName: string` |
+
+## Queue / Worker Architecture
+
+- **Queue**: BullMQ queue named `payroll-events`
+- **Worker**: `PayrollEventProcessor` processes jobs with configurable concurrency (default: 5)
+- **Job Lifecycle**: `PENDING → PROCESSING → SUCCESS | FAILED`
+- **Attempt Tracking**: Each processing attempt is recorded in the `event_attempts` table
+
+## Retry Behavior
+
+BullMQ retries failed jobs with exponential backoff:
+
+- **Max attempts**: 3
+- **Backoff**: Exponential, starting at 1s (1s, 2s, 4s)
+- **Temporary failures** (thrown errors): Retried by BullMQ
+- **Permanent failures** (returned `success: false` or `PermanentProcessingError`): Marked `FAILED` immediately, no retry
+
+## Idempotency Behavior
+
+- **Database constraint**: `idempotency_key` has a unique index on the `events` table
+- **Fast path**: Service checks for existing event by `idempotencyKey` before creating
+- **Race safety**: Concurrent requests with the same key hit the unique constraint; the duplicate is caught and the existing event is returned
+- **Worker idempotency**: If a job is re-executed for an already-SUCCESS event, processing is skipped
+
+## Per-Employee Ordering
+
+- **Sequence allocation**: Each event for an employee gets a monotonically increasing `sequence` number via the `employee_sequences` table
+- **Atomic allocation**: Uses `INSERT ON CONFLICT` + `UPDATE ... RETURNING` to prevent race conditions
+- **Enforcement**: Before processing, the worker checks if all earlier events for the same employee are in a terminal state (SUCCESS or FAILED)
+- **Blocking**: If earlier events are still pending/processing, the worker throws a temporary error and BullMQ retries later
+- **Cross-employee concurrency**: Different employees are processed independently; no global serialization
+
+## Worker Crash Recovery
+
+The `StuckEventRecoveryService` runs on a configurable interval (default: 30s):
+
+1. Queries for events in `PROCESSING` state whose `processing_started_at` exceeds the timeout (default: 60s)
+2. Atomically recovers stale events back to `PENDING`
+3. The event is then picked up by the worker again
+
+This prevents permanent `PROCESSING` states from worker crashes.
+
+## Running Tests
+
+```bash
+# Unit tests
+pnpm test
+
+# Test coverage
+pnpm test:cov
+
+# Watch mode
+pnpm test:watch
+```
+
+## Project Structure
+
+```
+src/
+├── common/
+│   ├── errors/           # Custom error classes
+│   └── filters/          # Exception filters
+├── config/               # Configuration
+├── infrastructure/
+│   ├── database/         # Drizzle ORM, schema, migrations
+│   ├── redis/            # Redis connection
+│   └── queue/            # BullMQ queue setup
+├── modules/
+│   ├── events/           # Event API, service, repositories, recovery
+│   └── health/           # Health check endpoint
+├── workers/
+│   ├── handlers/         # Event type handlers
+│   ├── payroll-event.processor.ts  # BullMQ worker
+│   └── worker.module.ts
+├── app.module.ts
+└── main.ts
+```
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED

@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  OnModuleDestroy,
-} from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';

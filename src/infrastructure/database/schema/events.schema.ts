@@ -52,8 +52,8 @@ export const events = pgTable(
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   (table) => ({
-    idempotencyKeyUnique: uniqueIndex(
-      'events_idempotency_key_unique',
-    ).on(table.idempotencyKey),
+    idempotencyKeyUnique: uniqueIndex('events_idempotency_key_unique').on(
+      table.idempotencyKey,
+    ),
   }),
 );

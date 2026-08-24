@@ -18,8 +18,7 @@ export class HealthService {
     ]);
 
     const healthy =
-      databaseStatus === 'connected' &&
-      redisStatus === 'connected';
+      databaseStatus === 'connected' && redisStatus === 'connected';
 
     return {
       status: healthy ? 'ok' : 'degraded',

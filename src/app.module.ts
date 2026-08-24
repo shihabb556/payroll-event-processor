@@ -3,9 +3,10 @@ import { DatabaseModule } from './infrastructure/database/database.module';
 import { ConfigModule } from '@nestjs/config';
 import { HealthModule } from './modules/health/health.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
+import { QueueModule } from './infrastructure/queue/queue.module';
 
 @Module({
-  imports: [ 
+  imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
@@ -13,6 +14,7 @@ import { RedisModule } from './infrastructure/redis/redis.module';
     DatabaseModule,
     HealthModule,
     RedisModule,
+    QueueModule,
   ],
   controllers: [],
   providers: [],

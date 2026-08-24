@@ -299,3 +299,83 @@ document.addEventListener('keydown', (e) => {
     document.getElementById('event-modal').classList.add('hidden');
   }
 });
+
+// ─── Polling for Event Status ───────────────────────────────── 
+async function pollEventStatus(eventId) {
+  const resultBox = document.getElementById('submit-result');
+
+  const poll = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/events/${eventId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch event status');
+      }
+
+      const event = data.event;
+
+      if (event.status === 'PENDING' || event.status === 'PROCESSING') {
+        resultBox.className = 'result-box info';
+        resultBox.innerHTML = `
+          <strong>Event is being processed...</strong><br>
+          Event ID: <code>${event.id}</code><br>
+          Status:
+          <span class="status-badge status-${event.status}">
+            ${event.status}
+          </span>
+        `;
+        resultBox.classList.remove('hidden');
+
+        setTimeout(poll, 1000);
+        return;
+      }
+
+      if (event.status === 'SUCCESS') {
+       resultBox.className = 'result-box info';
+       resultBox.innerHTML = `
+          <strong>Event submitted successfully.</strong><br>
+          Event ID: <code>${data.event.id}</code><br>
+          Status:
+          <span class="status-badge status-${data.event.status}">
+            ${data.event.status}
+          </span><br>
+          <small>Waiting for payroll processing...</small>
+        `;
+        resultBox.classList.remove('hidden');
+
+        // Start polling
+        pollEventStatus(data.event.id);
+        // Refresh event list if user later opens it
+        loadEvents();
+        return;
+      }
+
+      if (event.status === 'FAILED') {
+        resultBox.className = 'result-box error';
+        resultBox.innerHTML = `
+          <strong>Event processing failed</strong><br>
+          Event ID: <code>${event.id}</code><br>
+          Status:
+          <span class="status-badge status-FAILED">
+            FAILED
+          </span>
+
+          ${
+            event.failureReason
+              ? `<br>Reason: ${event.failureReason}`
+              : ''
+          }
+        `;
+        resultBox.classList.remove('hidden');
+
+        loadEvents();
+        return;
+      }
+    } catch (err) {
+      console.error('Polling failed:', err);
+    }
+  };
+
+  poll();
+}

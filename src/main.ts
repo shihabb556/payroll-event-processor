@@ -22,8 +22,8 @@ async function bootstrap(): Promise<void> {
   );
 
   // Serve static frontend files
-  app.useStaticAssets(join(__dirname, '..', 'public'));
-
+  app.useStaticAssets(join(__dirname, '..', '..', 'public'));
+  
   // Swagger / OpenAPI documentation
   const config = new DocumentBuilder()
     .setTitle('Payroll Event Processing API')

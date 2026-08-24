@@ -9,5 +9,6 @@ import { EventsService } from './events.service';
   imports: [QueueModule],
   controllers: [EventsController],
   providers: [EventsService, EventsRepository],
+  exports: [EventsRepository],
 })
 export class EventsModule {}

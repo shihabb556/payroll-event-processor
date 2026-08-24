@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 import { DatabaseService } from '../../../infrastructure/database/database.service';
 import { events } from '../../../infrastructure/database/schema/events.schema';
@@ -73,5 +73,62 @@ export class EventsRepository {
 
   async delete(id: string) {
     await this.database.db.delete(events).where(eq(events.id, id));
+  }
+
+  async markProcessing(id: string) {
+    const [event] = await this.database.db
+      .update(events)
+      .set({
+        status: 'PROCESSING',
+        processingStartedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(events.id, id))
+      .returning();
+
+    return event;
+  }
+
+  async markSuccess(id: string, result: Record<string, unknown>) {
+    const [event] = await this.database.db
+      .update(events)
+      .set({
+        status: 'SUCCESS',
+        result,
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(events.id, id))
+      .returning();
+
+    return event;
+  }
+
+  async markFailed(id: string, failureReason: string) {
+    const [event] = await this.database.db
+      .update(events)
+      .set({
+        status: 'FAILED',
+        failureReason,
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(events.id, id))
+      .returning();
+
+    return event;
+  }
+
+  async incrementAttemptCount(id: string) {
+    const [event] = await this.database.db
+      .update(events)
+      .set({
+        attemptCount: sql`${events.attemptCount} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(events.id, id))
+      .returning();
+
+    return event;
   }
 }

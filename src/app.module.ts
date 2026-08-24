@@ -5,6 +5,7 @@ import { QueueModule } from './infrastructure/queue/queue.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { EventsModule } from './modules/events/events.module';
 import { HealthModule } from './modules/health/health.module';
+import { WorkerModule } from './workers/worker.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { HealthModule } from './modules/health/health.module';
     QueueModule,
     HealthModule,
     EventsModule,
+    WorkerModule,
   ],
   controllers: [],
   providers: [],

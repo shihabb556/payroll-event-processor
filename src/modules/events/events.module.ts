@@ -6,6 +6,7 @@ import { EmployeeSequencesRepository } from './repositories/employee-sequences.r
 import { EventAttemptsRepository } from './repositories/event-attempts.repository';
 import { EventsRepository } from './repositories/events.repository';
 import { EventsService } from './events.service';
+import { StuckEventRecoveryService } from './stuck-event-recovery.service';
 
 @Module({
   imports: [QueueModule],
@@ -15,6 +16,7 @@ import { EventsService } from './events.service';
     EventsRepository,
     EventAttemptsRepository,
     EmployeeSequencesRepository,
+    StuckEventRecoveryService,
   ],
   exports: [
     EventsRepository,

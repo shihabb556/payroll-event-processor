@@ -1,0 +1,2 @@
+CREATE INDEX "events_processing_started_at_idx" ON "events" USING btree ("processing_started_at");--> statement-breakpoint
+CREATE INDEX "events_status_processing_idx" ON "events" USING btree ("status","processing_started_at");

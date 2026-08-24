@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, eq, lt, sql } from 'drizzle-orm';
+import { and, eq, lt, lte, sql } from 'drizzle-orm';
 
 import { DatabaseService } from '../../../infrastructure/database/database.service';
 import { events } from '../../../infrastructure/database/schema/events.schema';
@@ -133,6 +133,48 @@ export class EventsRepository {
 
   async delete(id: string) {
     await this.database.db.delete(events).where(eq(events.id, id));
+  }
+
+  /**
+   * Find events stuck in PROCESSING state beyond the given timeout.
+   * These are candidates for recovery (worker crash scenario).
+   */
+  async findStaleProcessingEvents(staleBefore: Date, limit: number) {
+    return this.database.db
+      .select()
+      .from(events)
+      .where(
+        and(
+          eq(events.status, 'PROCESSING'),
+          lte(events.processingStartedAt, staleBefore),
+        ),
+      )
+      .limit(limit);
+  }
+
+  /**
+   * Atomically recover a stale PROCESSING event back to PENDING.
+   * Only succeeds if the event is still PROCESSING and processingStartedAt
+   * is at or before the stale threshold. Returns the event if recovered, null otherwise.
+   */
+  async recoverStaleEvent(id: string, staleBefore: Date) {
+    const [event] = await this.database.db
+      .update(events)
+      .set({
+        status: 'PENDING',
+        processingStartedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(events.id, id),
+          eq(events.status, 'PROCESSING'),
+          lte(events.processingStartedAt, staleBefore),
+        ),
+      )
+      .returning();
+
+    return event ?? null;
   }
 
   /**

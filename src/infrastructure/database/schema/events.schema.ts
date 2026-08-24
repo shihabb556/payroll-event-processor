@@ -66,5 +66,12 @@ export const events = pgTable(
       table.employeeId,
       table.status,
     ),
+    processingStartedAtIndex: index('events_processing_started_at_idx').on(
+      table.processingStartedAt,
+    ),
+    statusProcessingIndex: index('events_status_processing_idx').on(
+      table.status,
+      table.processingStartedAt,
+    ),
   }),
 );

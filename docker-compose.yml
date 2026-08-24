@@ -31,6 +31,39 @@ services:
       timeout: 3s
       retries: 10
 
+  api:
+    build: .
+    container_name: payroll-api
+    restart: unless-stopped
+    command: node dist/main.js
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://payroll:payroll@postgres:5432/payroll
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    container_name: payroll-worker
+    restart: unless-stopped
+    command: node dist/main-worker.js
+    environment:
+      DATABASE_URL: postgresql://payroll:payroll@postgres:5432/payroll
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:

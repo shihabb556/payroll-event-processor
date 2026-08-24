@@ -71,7 +71,11 @@ describe('EventsService', () => {
       employeeId: 'EMP-001',
       eventType: EventType.SALARY_CHANGE,
       idempotencyKey: 'key-001',
-      payload: { effectiveDate: '2026-01-15', newSalary: 75000, currency: 'USD' },
+      payload: {
+        effectiveDate: '2026-01-15',
+        newSalary: 75000,
+        currency: 'USD',
+      },
     };
 
     it('should create event with sequence and enqueue job', async () => {

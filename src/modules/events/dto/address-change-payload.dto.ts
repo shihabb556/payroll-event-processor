@@ -2,7 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsDateString, IsNotEmpty, IsString } from 'class-validator';
 
 export class AddressChangePayloadDto {
-  @ApiProperty({ description: 'Date when the address change takes effect', example: '2026-02-01' })
+  @ApiProperty({
+    description: 'Date when the address change takes effect',
+    example: '2026-02-01',
+  })
   @IsDateString()
   effectiveDate!: string;
 

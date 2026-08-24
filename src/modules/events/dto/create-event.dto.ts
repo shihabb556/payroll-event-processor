@@ -8,17 +8,26 @@ export class CreateEventDto {
   @IsNotEmpty()
   employeeId!: string;
 
-  @ApiProperty({ enum: EventType, description: 'Type of payroll event', example: EventType.SALARY_CHANGE })
+  @ApiProperty({
+    enum: EventType,
+    description: 'Type of payroll event',
+    example: EventType.SALARY_CHANGE,
+  })
   @IsEnum(EventType)
   eventType!: EventType;
 
-  @ApiProperty({ description: 'Client-provided idempotency key to prevent duplicate processing', example: 'salary-change-emp001-20260101' })
+  @ApiProperty({
+    description:
+      'Client-provided idempotency key to prevent duplicate processing',
+    example: 'salary-change-emp001-20260101',
+  })
   @IsString()
   @IsNotEmpty()
   idempotencyKey!: string;
 
   @ApiProperty({
-    description: 'Event-type-specific payload. Required fields vary by eventType.',
+    description:
+      'Event-type-specific payload. Required fields vary by eventType.',
     example: { effectiveDate: '2026-01-15', newSalary: 75000, currency: 'USD' },
   })
   @IsObject()

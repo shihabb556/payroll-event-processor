@@ -24,6 +24,4 @@ export interface BankAccountChangePayload {
 }
 
 export type EventPayload =
-  | SalaryChangePayload
-  | AddressChangePayload
-  | BankAccountChangePayload;
+  SalaryChangePayload | AddressChangePayload | BankAccountChangePayload;

@@ -532,7 +532,11 @@ describe('PayrollEventProcessor', () => {
       expect(result.success).toBe(true);
       expect(typeof result.message).toBe('string');
       expect(typeof result.processedAt).toBe('string');
-      expect(result.data).toEqual({ newSalary: 75000, currency: 'USD', effectiveDate: '2026-01-15' });
+      expect(result.data).toEqual({
+        newSalary: 75000,
+        currency: 'USD',
+        effectiveDate: '2026-01-15',
+      });
     });
 
     it('should persist failure reason on permanent failure', async () => {

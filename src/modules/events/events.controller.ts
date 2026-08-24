@@ -7,12 +7,7 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
-import {
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { CreateEventDto } from './dto/create-event.dto';
 import { EventAttemptsRepository } from './repositories/event-attempts.repository';
@@ -29,7 +24,10 @@ export class EventsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Submit a payroll event for processing' })
-  @ApiResponse({ status: 201, description: 'Event created or already exists (idempotent)' })
+  @ApiResponse({
+    status: 201,
+    description: 'Event created or already exists (idempotent)',
+  })
   @ApiResponse({ status: 400, description: 'Invalid request payload' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async createEvent(@Body() dto: CreateEventDto) {

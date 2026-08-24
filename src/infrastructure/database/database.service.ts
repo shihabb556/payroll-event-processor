@@ -1,12 +1,13 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import postgres from 'postgres';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import postgres, { type Sql } from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
-  private readonly client;
-  readonly db;
+  private readonly client: Sql;
+  readonly db: PostgresJsDatabase<Record<string, never>>;
 
   constructor(private readonly config: ConfigService) {
     const databaseUrl = this.config.getOrThrow<string>('DATABASE_URL');
@@ -15,7 +16,7 @@ export class DatabaseService implements OnModuleDestroy {
     this.db = drizzle(this.client);
   }
 
-  async onModuleDestroy() {
+  async onModuleDestroy(): Promise<void> {
     await this.client.end();
   }
 }
